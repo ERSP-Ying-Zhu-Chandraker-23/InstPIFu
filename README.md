@@ -135,5 +135,5 @@ If you find our work useful, please cite
 
 
 
-Authors working on merging with PhotoScene: Khushi Patel, Kevin Ly, Amy Kho, Jaiden Ekgasit
+Authors working on merging with PhotoScene: Khushi Patel, Kevin Ly, Amy Koh, Jaiden Ekgasit
 PhotoScene: https://github.com/ViLab-UCSD/PhotoScene
