@@ -6,6 +6,8 @@ import os
 import yaml
 import logging
 from datetime import datetime
+from configs.data_config import Config as Data_Config
+from net_utils.libs import to_dict_tensor
 
 def update_recursive(dict1, dict2):
     ''' Update two config dictionaries recursively.
@@ -120,3 +122,11 @@ class CONFIG(object):
         logger.setLevel(logging.INFO)
         logger.addHandler(self.__file_handler)
         self._logger = logger
+
+    def mount_external_config(cfg):
+        if cfg.config['data']['dataset'] == 'sunrgbd':
+            dataset_config = Data_Config('sunrgbd')
+            bins_tensor = to_dict_tensor(dataset_config.bins, if_cuda=cfg.config['device']['use_gpu'])
+            setattr(cfg, 'dataset_config', dataset_config)
+            setattr(cfg, 'bins_tensor', bins_tensor)
+        return cfg

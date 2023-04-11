@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "bridge-to-kubernetes.resource",
+			"type": "bridge-to-kubernetes.resource",
+			"resource": "amy-service",
+			"resourceType": "service",
+			"ports": [
+				80
+			],
+			"targetCluster": "nautilus",
+			"targetNamespace": "mc-lab",
+			"useKubernetesServiceEnvironmentVariables": false
+		}
+	]
+}
