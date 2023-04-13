@@ -123,10 +123,10 @@ class CONFIG(object):
         logger.addHandler(self.__file_handler)
         self._logger = logger
 
-    def mount_external_config(cfg):
-        if cfg.config['data']['dataset'] == 'sunrgbd':
-            dataset_config = Data_Config('sunrgbd')
-            bins_tensor = to_dict_tensor(dataset_config.bins, if_cuda=cfg.config['device']['use_gpu'])
-            setattr(cfg, 'dataset_config', dataset_config)
-            setattr(cfg, 'bins_tensor', bins_tensor)
-        return cfg
+def mount_external_config(cfg):
+    if cfg.config['data']['dataset'] == 'sunrgbd':
+        dataset_config = Data_Config('sunrgbd')
+        bins_tensor = to_dict_tensor(dataset_config.bins, if_cuda=cfg.config['device']['use_gpu'])
+        setattr(cfg, 'dataset_config', dataset_config)
+        setattr(cfg, 'bins_tensor', bins_tensor)
+    return cfg
