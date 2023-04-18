@@ -95,7 +95,7 @@ def load_demo_data(demo_path, device):
 
     """assemble data"""
     data = collate_fn([{'whole image':image, 'boxes_batch':boxes, 'camera':camera}])
-    image = data['image'].to(device)
+    image = data['whole image'].to(device)
     K = data['camera']['K'].float().to(device)
     patch = data['boxes_batch']['patch'].to(device)
     size_cls = data['boxes_batch']['size_cls'].float().to(device)
