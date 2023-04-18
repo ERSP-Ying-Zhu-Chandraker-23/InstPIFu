@@ -94,8 +94,8 @@ def load_demo_data(demo_path, device):
     boxes['bdb2D_pos'] = np.array(bdb2D_pos)
 
     """assemble data"""
-    data = collate_fn([{'whole image':image, 'boxes_batch':boxes, 'camera':camera}])
-    image = data['whole image'].to(device)
+    data = collate_fn([{'image':image, 'boxes_batch':boxes, 'camera':camera}])
+    image = data['image'].to(device)
     K = data['camera']['K'].float().to(device)
     patch = data['boxes_batch']['patch'].to(device)
     size_cls = data['boxes_batch']['size_cls'].float().to(device)
@@ -108,7 +108,7 @@ def load_demo_data(demo_path, device):
                                         torch.argmax(size_cls, dim=1)]] = 1
     bdb2D_pos = data['boxes_batch']['bdb2D_pos'].float().to(device)
 
-    input_data = {'whole image':image, 'K':K, 'patch':patch, 'patch_for_mesh':patch, 'g_features':g_features,
+    input_data = {'whole_image':image, 'image':image,'K':K, 'patch':patch, 'patch_for_mesh':patch, 'g_features':g_features,
                   'size_cls':size_cls, 'split':split, 'rel_pair_counts':rel_pair_counts,
                   'cls_codes':cls_codes, 'bdb2D_pos':bdb2D_pos}
     return input_data
