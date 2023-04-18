@@ -258,6 +258,7 @@ class InstPIFu(BasePIFuNet):
             return error + self.mask_loss
 
     def forward(self, data_dict):
+        print("data_dict keys in InstPIFu_net.py line 261: ", data_dict.keys())
         # Get image feature
         images, points, labels,img_coor,cls_codes = data_dict["whole_image"],data_dict["samples"],data_dict["inside_class"],data_dict["img_coor"],data_dict["cls_codes"]
         patch=data_dict["patch"]
