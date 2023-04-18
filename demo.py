@@ -129,7 +129,7 @@ def run(cfg):
 
     '''Load net'''
     cfg.log_string('Loading model.')
-    net = get_model(cfg, device=device)
+    net = get_model(cfg.config, device=device)
     checkpoint.register_modules(net=net)
     cfg.log_string(net)
 

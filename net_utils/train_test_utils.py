@@ -343,15 +343,15 @@ def load_device(cfg):
 def get_model(cfg,device):
     #print("CFG line 345 in train_test_utils", cfg)
     #print("CFG method line 346 in train_test_utils", cfg['method'])
-    if cfg.config['method']=="instPIFu":
+    if cfg['method']=="instPIFu":
         from models.instPIFu.InstPIFu_net import InstPIFu
-        model=InstPIFu(cfg.config).to(device)
-    elif cfg.config['method']=="bgPIFu":
+        model=InstPIFu(cfg).to(device)
+    elif cfg['method']=="bgPIFu":
         from models.bg_PIFu.BGPIFu_net import BGPIFu_Net
-        model=BGPIFu_Net(cfg.config).to(device)
-    elif cfg.config['method']=="det":
+        model=BGPIFu_Net(cfg).to(device)
+    elif cfg['method']=="det":
         from models.detection.network import TOTAL3D
-        model=TOTAL3D(cfg.config).to(device)
+        model=TOTAL3D(cfg).to(device)
     else:
         raise NotImplementedError
     return model
