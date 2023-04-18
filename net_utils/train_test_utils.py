@@ -341,6 +341,8 @@ def load_device(cfg):
         return torch.device("cpu")
 
 def get_model(cfg,device):
+    #print("CFG line 345 in train_test_utils", cfg)
+    #print("CFG method line 346 in train_test_utils", cfg['method'])
     if cfg['method']=="instPIFu":
         from models.instPIFu.InstPIFu_net import InstPIFu
         model=InstPIFu(cfg).to(device)
