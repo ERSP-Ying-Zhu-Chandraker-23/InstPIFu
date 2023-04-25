@@ -108,6 +108,10 @@ def load_demo_data(demo_path, device):
                                         torch.argmax(size_cls, dim=1)]] = 1
     bdb2D_pos = data['boxes_batch']['bdb2D_pos'].float().to(device)
 
+    print("Boxes keys in demo.py line 111:  ", boxes.keys())
+    print("Camera keys in demo.py line 112:  ", camera.keys())
+
+
     input_data = {'whole_image':image, 'image':image,'K':K, 'patch':patch, 'patch_for_mesh':patch, 'g_features':g_features,
                   'size_cls':size_cls, 'split':split, 'rel_pair_counts':rel_pair_counts,
                   'cls_codes':cls_codes, 'bdb2D_pos':bdb2D_pos}
