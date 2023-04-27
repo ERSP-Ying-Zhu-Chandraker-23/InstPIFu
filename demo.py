@@ -1,236 +1,110 @@
-# Demo script
-# author: ynie
-# date: April, 2020
-# from net_utils.utils import load_device, load_model
-# from net_utils.utils import CheckpointIO
-from net_utils.train_test_utils import load_device, get_model, get_dataloader,CheckpointIO,get_tester
-from configs.config_utils import mount_external_config
 import numpy as np
 import torch
-from torchvision import transforms
+from configs.config_utils import CONFIG
+import argparse
+from dataset.front3d_recon_dataset import Front3D_Recon_Dataset
+from dataset.front3d_bg_dataset import FRONT_bg_dataset
+from torch.utils.data import DataLoader
+from models.instPIFu.InstPIFu_net import InstPIFu
+from models.bg_PIFu.BGPIFu_net import BGPIFu_Net
+import datetime
 import os
-from time import time
-from PIL import Image
-import json
-import math
-from configs.data_config import Relation_Config, NYU40CLASSES, NYU37_TO_PIX3D_CLS_MAPPING
-rel_cfg = Relation_Config()
-d_model = int(rel_cfg.d_g/4)
-from models.total3d.dataloader import collate_fn
+import time
+import cv2
 
-HEIGHT_PATCH = 256
-WIDTH_PATCH = 256
+def dataset2dataloader(dataset):
+    dataloader = DataLoader(dataset,
+                            num_workers=1,
+                            batch_size=1,
+                            shuffle=False
+                            )
+    return dataloader
 
-data_transforms = transforms.Compose([
-    transforms.Resize((HEIGHT_PATCH, WIDTH_PATCH)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+def parse_args():
+    '''PARAMETERS'''
+    parser = argparse.ArgumentParser('Refer-it-in-RGBD demo')
+    parser.add_argument('--testid', type=str, default='rendertask7522', help='train, test or demo.')
+    return parser.parse_args()
 
-def parse_detections(detections):
-    bdb2D_pos = []
-    size_cls = []
-    for det in detections:
-        bdb2D_pos.append(det['bbox'])
-        size_cls.append(NYU40CLASSES.index(det['class']))
-    return bdb2D_pos, size_cls
+if __name__=="__main__":
+    args=parse_args()
+    instPIFu_config_path="./configs/test_instPIFu.yaml"
+    bg_config_path="./configs/test_bg_PIFu.yaml"
 
-def get_g_features(bdb2D_pos):
-    n_objects = len(bdb2D_pos)
-    g_feature = [[((loc2[0] + loc2[2]) / 2. - (loc1[0] + loc1[2]) / 2.) / (loc1[2] - loc1[0]),
-                  ((loc2[1] + loc2[3]) / 2. - (loc1[1] + loc1[3]) / 2.) / (loc1[3] - loc1[1]),
-                  math.log((loc2[2] - loc2[0]) / (loc1[2] - loc1[0])),
-                  math.log((loc2[3] - loc2[1]) / (loc1[3] - loc1[1]))] \
-                 for id1, loc1 in enumerate(bdb2D_pos)
-                 for id2, loc2 in enumerate(bdb2D_pos)]
+    instPIFu_config=CONFIG(instPIFu_config_path).config
+    bg_config=CONFIG(bg_config_path).config
+    instPIFu_config['data']['test_class_name']="test_all"
+    instPIFu_config['data']['use_pred_pose']=True #to use predict pose or not
+    instPIFu_model=InstPIFu(instPIFu_config).cuda()
+    instPIFu_checkpoints=torch.load(instPIFu_config["weight"])
+    instPIFu_net_weight=instPIFu_checkpoints['net']
+    instPIFu_new_net_weight={}
+    for key in instPIFu_net_weight:
+        if key.startswith("module."):
+            k_ = key[7:]
+            instPIFu_new_net_weight[k_] = instPIFu_net_weight[key]
+    instPIFu_model.load_state_dict(instPIFu_new_net_weight)
+    instPIFu_model.eval()
+    inst_PIFu_dataset=Front3D_Recon_Dataset(instPIFu_config,"test",testid=args.testid)
+    instPIFu_loader=dataset2dataloader(inst_PIFu_dataset)
 
-    locs = [num for loc in g_feature for num in loc]
+    bg_model=BGPIFu_Net(bg_config).cuda()
+    bg_checkpoints=torch.load(bg_config['weight'])
+    bg_net_weight=bg_checkpoints['net']
+    bg_new_net_weight={}
+    for key in bg_net_weight:
+        if key.startswith("module."):
+            k_=key[7:]
+            bg_new_net_weight[k_]=bg_net_weight[key]
+    bg_model.load_state_dict(bg_new_net_weight)
+    bg_model.eval()
 
-    pe = torch.zeros(len(locs), d_model)
-    position = torch.from_numpy(np.array(locs)).unsqueeze(1).float()
-    div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(math.log(10000.) / d_model))
-    pe[:, 0::2] = torch.sin(position * div_term)
-    pe[:, 1::2] = torch.cos(position * div_term)
+    bg_dataset=FRONT_bg_dataset(bg_config,"test",testid=args.testid)
+    bg_loader=dataset2dataloader(bg_dataset)
+    save_folder=os.path.join("outputs",args.testid)
+    if os.path.exists(save_folder)==False:
+        os.makedirs(save_folder)
+    '''inference all objects'''
+    start_t=time.time()
+    for batch_id, data_batch in enumerate(instPIFu_loader):
+        for key in data_batch:
+            if isinstance(data_batch[key], list) == False:
+                data_batch[key] = data_batch[key].float().cuda()
+        with torch.no_grad():
+            mesh = instPIFu_model.extract_mesh(data_batch, instPIFu_config['data']['marching_cube_resolution'])
+            rot_matrix=data_batch["rot_matrix"][0].cpu().numpy()
+            obj_cam_center=data_batch["obj_cam_center"][0].cpu().numpy()
+            bbox_size=data_batch["bbox_size"][0].cpu().numpy()
 
-    return pe.view(n_objects * n_objects, rel_cfg.d_g)
+            '''transform mesh to camera coordinate'''
+            obj_vert=np.asarray(mesh.vertices)
+            obj_vert=obj_vert/2*bbox_size
+            obj_vert=np.dot(obj_vert,rot_matrix.T)
+            obj_vert[:,0:2]=-obj_vert[:,0:2]
+            obj_vert+=obj_cam_center
+            mesh.vertices=np.asarray(obj_vert.copy())
 
-def load_demo_data(demo_path, device):
-    img_path = os.path.join(demo_path, 'img.jpg')
-    assert os.path.exists(img_path)
-
-    cam_K_path = os.path.join(demo_path, 'cam_K.txt')
-    assert os.path.exists(cam_K_path)
-
-    detection_path = os.path.join(demo_path, 'detections.json')
-    assert detection_path
-
-    '''preprocess'''
-    image = Image.open(img_path).convert('RGB')
-    cam_K = np.loadtxt(cam_K_path)
-    with open(detection_path, 'r') as file:
-        detections = json.load(file)
-    boxes = dict()
-
-    bdb2D_pos, size_cls = parse_detections(detections)
-
-    # obtain geometric features
-    boxes['g_feature'] = get_g_features(bdb2D_pos)
-
-    # encode class
-    cls_codes = torch.zeros([len(size_cls), len(NYU40CLASSES)])
-    cls_codes[range(len(size_cls)), size_cls] = 1
-    boxes['size_cls'] = cls_codes
-
-    # get object images
-    patch = []
-    for bdb in bdb2D_pos:
-        img = image.crop((bdb[0], bdb[1], bdb[2], bdb[3]))
-        img = data_transforms(img)
-        patch.append(img)
-    boxes['patch'] = torch.stack(patch)
-    image = data_transforms(image)
-    camera = dict()
-    camera['K'] = cam_K
-    boxes['bdb2D_pos'] = np.array(bdb2D_pos)
-
-    """assemble data"""
-    data = collate_fn([{'image':image, 'boxes_batch':boxes, 'camera':camera}])
-    image = data['image'].to(device)
-    K = data['camera']['K'].float().to(device)
-    patch = data['boxes_batch']['patch'].to(device)
-    size_cls = data['boxes_batch']['size_cls'].float().to(device)
-    g_features = data['boxes_batch']['g_feature'].float().to(device)
-    split = data['obj_split']
-    rel_pair_counts = torch.cat([torch.tensor([0]), torch.cumsum(
-        torch.pow(data['obj_split'][:, 1] - data['obj_split'][:, 0], 2), 0)], 0)
-    cls_codes = torch.zeros([size_cls.size(0), 9]).to(device)
-    cls_codes[range(size_cls.size(0)), [NYU37_TO_PIX3D_CLS_MAPPING[cls.item()] for cls in
-                                        torch.argmax(size_cls, dim=1)]] = 1
-    bdb2D_pos = data['boxes_batch']['bdb2D_pos'].float().to(device)
-
-    print("Boxes keys in demo.py line 111:  ", boxes.keys())
-    print("Camera keys in demo.py line 112:  ", camera.keys())
-
-
-    input_data = {'whole_image':image, 'image':image,'K':K, 'patch':patch, 'patch_for_mesh':patch, 'g_features':g_features,
-                  'size_cls':size_cls, 'split':split, 'rel_pair_counts':rel_pair_counts,
-                  'cls_codes':cls_codes, 'bdb2D_pos':bdb2D_pos}
-    return input_data
-
-def run(cfg):
-    '''Begin to run network.'''
-    checkpoint = CheckpointIO(cfg)
-
-    '''Mount external config data'''
-    cfg = mount_external_config(cfg)
-
-    '''Load save path'''
-    cfg.log_string('Data save path: %s' % (cfg.save_path))
-
-    '''Load device'''
-    cfg.log_string('Loading device settings.')
-    device = load_device(cfg)
-
-    '''Load net'''
-    cfg.log_string('Loading model.')
-    net = get_model(cfg.config, device=device)
-    checkpoint.register_modules(net=net)
-    cfg.log_string(net)
-
-    '''Load existing checkpoint'''
-    checkpoint.parse_checkpoint()
-    cfg.log_string('-' * 100)
-
-    '''Load data'''
-    cfg.log_string('Loading data.')
-    data = load_demo_data(cfg.config['demo_path'], device)
-
-    '''Run demo'''
-    net.train(cfg.config['mode'] == 'train')
-    with torch.no_grad():
-        start = time()
-        est_data = net(data)
-        end = time()
-
-    print('Time elapsed: %s.' % (end-start))
-
-    '''write and visualize outputs'''
-    from net_utils.libs import get_layout_bdb_sunrgbd, get_rotation_matix_result, get_bdb_evaluation
-    from scipy.io import savemat
-    from libs.tools import write_obj
-
-    lo_bdb3D_out = get_layout_bdb_sunrgbd(cfg.bins_tensor, est_data['lo_ori_reg_result'],
-                                          torch.argmax(est_data['lo_ori_cls_result'], 1),
-                                          est_data['lo_centroid_result'],
-                                          est_data['lo_coeffs_result'])
-    # camera orientation for evaluation
-    cam_R_out = get_rotation_matix_result(cfg.bins_tensor,
-                                          torch.argmax(est_data['pitch_cls_result'], 1), est_data['pitch_reg_result'],
-                                          torch.argmax(est_data['roll_cls_result'], 1), est_data['roll_reg_result'])
-
-    # projected center
-    P_result = torch.stack(((data['bdb2D_pos'][:, 0] + data['bdb2D_pos'][:, 2]) / 2 -
-                            (data['bdb2D_pos'][:, 2] - data['bdb2D_pos'][:, 0]) * est_data['offset_2D_result'][:, 0],
-                            (data['bdb2D_pos'][:, 1] + data['bdb2D_pos'][:, 3]) / 2 -
-                            (data['bdb2D_pos'][:, 3] - data['bdb2D_pos'][:, 1]) * est_data['offset_2D_result'][:,1]), 1)
-
-    bdb3D_out_form_cpu, bdb3D_out = get_bdb_evaluation(cfg.bins_tensor,
-                                                       torch.argmax(est_data['ori_cls_result'], 1),
-                                                       est_data['ori_reg_result'],
-                                                       torch.argmax(est_data['centroid_cls_result'], 1),
-                                                       est_data['centroid_reg_result'],
-                                                       data['size_cls'], est_data['size_reg_result'], P_result,
-                                                       data['K'], cam_R_out, data['split'], return_bdb=True)
-
-    # save results
-    nyu40class_ids = [int(evaluate_bdb['classid']) for evaluate_bdb in bdb3D_out_form_cpu]
-    save_path = cfg.config['demo_path'].replace('inputs', 'outputs')
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    # save layout
-    savemat(os.path.join(save_path, 'layout.mat'),
-            mdict={'layout': lo_bdb3D_out[0, :, :].cpu().numpy()})
-    # save bounding boxes and camera poses
-    interval = data['split'][0].cpu().tolist()
-    current_cls = nyu40class_ids[interval[0]:interval[1]]
-
-    savemat(os.path.join(save_path, 'bdb_3d.mat'),
-            mdict={'bdb': bdb3D_out_form_cpu[interval[0]:interval[1]], 'class_id': current_cls})
-    savemat(os.path.join(save_path, 'r_ex.mat'),
-            mdict={'cam_R': cam_R_out[0, :, :].cpu().numpy()})
-    # save meshes
-    current_faces = est_data['out_faces'][interval[0]:interval[1]]
-    current_coordinates = est_data['meshes'][interval[0]:interval[1]]
-
-    for obj_id, obj_cls in enumerate(current_cls):
-        file_path = os.path.join(save_path, '%s_%s.obj' % (obj_id, obj_cls))
-
-        mesh_obj = {'v': current_coordinates[obj_id].transpose(-1, -2).cpu().numpy(),
-                    'f': current_faces[obj_id].cpu().numpy()}
-
-        write_obj(file_path, mesh_obj)
-
-    #########################################################################
-    #
-    #   Visualization
-    #
-    #########################################################################
-    import scipy.io as sio
-    from utils.visualize import format_bbox, format_layout, format_mesh, Box
-    from glob import glob
-
-    pre_layout_data = sio.loadmat(os.path.join(save_path, 'layout.mat'))['layout']
-    pre_box_data = sio.loadmat(os.path.join(save_path, 'bdb_3d.mat'))
-
-    pre_boxes = format_bbox(pre_box_data, 'prediction')
-    pre_layout = format_layout(pre_layout_data)
-    pre_cam_R = sio.loadmat(os.path.join(save_path, 'r_ex.mat'))['cam_R']
-
-    vtk_objects, pre_boxes = format_mesh(glob(os.path.join(save_path, '*.obj')), pre_boxes)
-
-    image = np.array(Image.open(os.path.join(cfg.config['demo_path'], 'img.jpg')).convert('RGB'))
-    cam_K = np.loadtxt(os.path.join(cfg.config['demo_path'], 'cam_K.txt'))
-
-    scene_box = Box(image, None, cam_K, None, pre_cam_R, None, pre_layout, None, pre_boxes, 'prediction', output_mesh = vtk_objects)
-    scene_box.draw_projected_bdb3d('prediction', if_save=True, save_path = '%s/3dbbox.png' % (save_path))
-    scene_box.draw3D(if_save=True, save_path = '%s/recon.png' % (save_path))
+            object_id=data_batch["obj_id"][0]
+            save_path=os.path.join(save_folder,args.testid+"_%s"%(object_id)+".ply")
+            mesh.export(save_path)
+        msg = "{:0>8},[{}/{}]".format(
+            str(datetime.timedelta(seconds=round(time.time() - start_t))),
+            batch_id + 1,
+            len(instPIFu_loader),
+        )
+        print(msg)
+    whole_image=data_batch["whole_image"][0].cpu()*torch.tensor([0.229,0.224,0.225])[:,None,None]+\
+    torch.tensor([0.485,0.456,0.406])[:,None,None]
+    whole_image=(whole_image.permute(1,2,0).numpy()*255.0).astype(np.uint8)
+    save_path=os.path.join(save_folder,"input.jpg")
+    print(save_path)
+    cv2.imwrite(save_path,whole_image)
+    # '''inference background'''
+    # for batch_id, data_batch in enumerate(bg_loader):
+    #     for key in data_batch:
+    #         if isinstance(data_batch[key], list) == False:
+    #             data_batch[key] = data_batch[key].float().cuda()
+    #     with torch.no_grad():
+    #         bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
+    #     save_path=os.path.join(save_folder,"bg.pkl")
+    #     bg_mesh.export(save_path)
