@@ -28,10 +28,7 @@ def parse_args():
 
 if __name__=="__main__":
     args=parse_args()
-<<<<<<< HEAD
-=======
     '''need to specify which weight files to load in the .yaml file'''
->>>>>>> 2e0f23df972c1292b1d1c970f5dede273c19200b
     instPIFu_config_path="./configs/test_instPIFu.yaml"
     bg_config_path="./configs/test_bg_PIFu.yaml"
 
@@ -52,7 +49,6 @@ if __name__=="__main__":
     inst_PIFu_dataset=Front3D_Recon_Dataset(instPIFu_config,"test",testid=args.testid)
     instPIFu_loader=dataset2dataloader(inst_PIFu_dataset)
 
-<<<<<<< HEAD
     bg_model=BGPIFu_Net(bg_config).cuda()
     bg_checkpoints=torch.load(bg_config['weight'])
     bg_net_weight=bg_checkpoints['net']
@@ -63,18 +59,6 @@ if __name__=="__main__":
             bg_new_net_weight[k_]=bg_net_weight[key]
     bg_model.load_state_dict(bg_new_net_weight)
     bg_model.eval()
-=======
-    # bg_model=BGPIFu_Net(bg_config).cuda()
-    # bg_checkpoints=torch.load(bg_config['weight'])
-    # bg_net_weight=bg_checkpoints['net']
-    # bg_new_net_weight={}
-    # for key in bg_net_weight:
-    #     if key.startswith("module."):
-    #         k_=key[7:]
-    #         bg_new_net_weight[k_]=bg_net_weight[key]
-    # bg_model.load_state_dict(bg_new_net_weight)
-    # bg_model.eval()
->>>>>>> 2e0f23df972c1292b1d1c970f5dede273c19200b
 
     bg_dataset=FRONT_bg_dataset(bg_config,"test",testid=args.testid)
     bg_loader=dataset2dataloader(bg_dataset)
@@ -116,7 +100,6 @@ if __name__=="__main__":
     save_path=os.path.join(save_folder,"input.jpg")
     print(save_path)
     cv2.imwrite(save_path,whole_image)
-<<<<<<< HEAD
     # '''inference background'''
     for batch_id, data_batch in enumerate(bg_loader):
          for key in data_batch:
@@ -126,18 +109,3 @@ if __name__=="__main__":
              bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
          save_path=os.path.join(save_folder,"bg.pkl")
          bg_mesh.export(save_path)
-=======
-    '''background inference will be added'''
-    # '''inference background'''
-    # for batch_id, data_batch in enumerate(bg_loader):
-    #     for key in data_batch:
-    #         if isinstance(data_batch[key], list) == False:
-    #             data_batch[key] = data_batch[key].float().cuda()
-    #     with torch.no_grad():
-    #         bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
-    #     save_path=os.path.join(save_folder,"bg.pkl")
-    #     bg_mesh.export(save_path)
-
-
-
->>>>>>> 2e0f23df972c1292b1d1c970f5dede273c19200b
