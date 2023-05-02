@@ -17,6 +17,8 @@ pip install -r requirements.txt
 ```
 
 # Data Preparation
+### Pix3D dataset
+download prepared pix3d data in the following link: <a href="https://cuhko365-my.sharepoint.com/:u:/g/personal/115010192_link_cuhk_edu_cn/Ed3a-GoWfRpLpug1T9Up000Bn7L7NU5kDAk5Q9izx5LQmg?e=Ykjgtq" target="__blank">pix3d_data.zip</a>. Unzip the folder and put the pix3d folder under ./data.
 ### 3D FRONT dataset
 The prepare data for training is in the following link: <a href="https://cuhko365-my.sharepoint.com/:f:/g/personal/115010192_link_cuhk_edu_cn/Eg99g4P1VMVJoZ5fz3lmDkABvj7Gc7yCjq-qBuYNqWjl2w?e=72lix4" target="__blank">training_data</a>.
 Download prepare_data.zip, occ.zip, mask.zip, and unzip them under ./data/3dfront. 
@@ -55,6 +57,7 @@ run the following commands for training:
 python main.py --mode train --config ./configs/train_instPIFu.yaml
 ```
 After the training is finished, the weight file will be stored in ./checkpoints/<exp_name>/model_best.pth.
+Running the configuraion file ./configs/train_instPIFu_onpix3d.yaml will train instPIFu on pix3d dataset.
 ### Testing
 run the following commands to extract mesh result:
 ```angular2html
@@ -65,6 +68,8 @@ you can download it for testing on 3D-FRONT data.
 The weight entry in the config file is required to be modified to the weight file that you want to test. 
 The mesh files will be saved in ./checkpoints/<exp_name>/xxx.ply
 <\br>
+weight file for pix3d dataset is in <a href="https://cuhko365-my.sharepoint.com/:u:/g/personal/115010192_link_cuhk_edu_cn/ES4SqMFhnR9DipjSWhBt5C4BomRDF7jO-7AE1v-FaS5l6g?e=V3XTWV" target="__blank">model_best_pix3d.pth</a>.
+Download the weigt file, and change the weight entry in ./configs/test_instPIFu_onpix3d.yaml, you will be able to inference on pix3d dataset.
 ### Evaluation
 For evaluation, gaps is required to be installed for conduct ICP alignment. Run the following commands to install gaps:
 ```angular2html
@@ -113,8 +118,17 @@ Testing is conducted by running the following commands:
 ```angular2html
 python main.py --mode train --config ./configs/inference_object_detection.yaml
 ```
+Detection results can be found in <a href="https://cuhko365-my.sharepoint.com/:u:/g/personal/115010192_link_cuhk_edu_cn/Ef44MzLaMwpClQ_wXXpzTAIBPzOkPZ8CLO89W4XFWIpMzw?e=J1DfNP" target="__blank">detection_result.zip</a>.
+Unzip the folder, and make sure to modify the pred_pose_path entry in test_instPIFu.yaml to use the detection results for object reconstruction.
 ### testing object reconstrution with predicted pose
 you can update the entry use_pred_pose, and pred_pose_path (path storing the object detection result) in test_instPIFu.yaml to use the predicted pose during mesh reconstruction.
+
+## Demo
+Visualization results can be obtained by running:
+```angular2html
+python demo.py --taskid rendertaskxxxx
+```
+The results will be saved into ./output/rendertaskxxx/*.ply
 
 # To Do
 - [x] Codes for background reconstruction
