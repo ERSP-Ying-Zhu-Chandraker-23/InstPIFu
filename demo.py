@@ -100,11 +100,11 @@ if __name__=="__main__":
     print(save_path)
     cv2.imwrite(save_path,whole_image)
     # '''inference background'''
-    # for batch_id, data_batch in enumerate(bg_loader):
-    #     for key in data_batch:
-    #         if isinstance(data_batch[key], list) == False:
-    #             data_batch[key] = data_batch[key].float().cuda()
-    #     with torch.no_grad():
-    #         bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
-    #     save_path=os.path.join(save_folder,"bg.pkl")
-    #     bg_mesh.export(save_path)
+    for batch_id, data_batch in enumerate(bg_loader):
+         for key in data_batch:
+             if isinstance(data_batch[key], list) == False:
+                 data_batch[key] = data_batch[key].float().cuda()
+         with torch.no_grad():
+             bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
+         save_path=os.path.join(save_folder,"bg.pkl")
+         bg_mesh.export(save_path)
