@@ -112,8 +112,14 @@ if __name__=="__main__":
             bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
         save_path=os.path.join(save_folder,"bg.ply")
         print("saving to %s"%(save_path))
-        #bg_mesh.export(save_path)
-        bg_mesh.trimesh.exchange.ply.export_ply(save_path)
+        bg_mesh.export(save_path)
 
 
+'''
+        result = trimesh.exchange.ply.export_ply(bg_mesh, encoding='ascii')
+        output_file = open(save_path, "wb+")
+        output_file.write(result)
+        output_file.close()
+
+'''
 
