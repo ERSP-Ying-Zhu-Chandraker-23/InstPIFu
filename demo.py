@@ -76,6 +76,7 @@ if __name__=="__main__":
             rot_matrix=data_batch["rot_matrix"][0].cpu().numpy()
             obj_cam_center=data_batch["obj_cam_center"][0].cpu().numpy()
             bbox_size=data_batch["bbox_size"][0].cpu().numpy()
+            #pitch=data_batch["pitch"][0].cpu().numpy()
 
             '''transform mesh to camera coordinate'''
             obj_vert=np.asarray(mesh.vertices)
@@ -87,6 +88,7 @@ if __name__=="__main__":
 
             object_id=data_batch["obj_id"][0]
             save_path=os.path.join(save_folder,args.testid+"_%s"%(object_id)+".ply")
+            print("saving to %s"%(save_path))
             mesh.export(save_path)
         msg = "{:0>8},[{}/{}]".format(
             str(datetime.timedelta(seconds=round(time.time() - start_t))),
@@ -98,14 +100,20 @@ if __name__=="__main__":
     torch.tensor([0.485,0.456,0.406])[:,None,None]
     whole_image=(whole_image.permute(1,2,0).numpy()*255.0).astype(np.uint8)
     save_path=os.path.join(save_folder,"input.jpg")
-    print(save_path)
+    #print(save_path)
     cv2.imwrite(save_path,whole_image)
-    # '''inference background'''
+    '''background inference will be added'''
+    '''inference background'''
     for batch_id, data_batch in enumerate(bg_loader):
-         for key in data_batch:
-             if isinstance(data_batch[key], list) == False:
-                 data_batch[key] = data_batch[key].float().cuda()
-         with torch.no_grad():
-             bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
-         save_path=os.path.join(save_folder,"bg.pkl")
-         bg_mesh.export(save_path)
+        for key in data_batch:
+            if isinstance(data_batch[key], list) == False:
+                data_batch[key] = data_batch[key].float().cuda()
+        with torch.no_grad():
+            bg_mesh = bg_model.extract_mesh(data_batch, bg_config['data']['marching_cube_resolution'])
+        save_path=os.path.join(save_folder,"bg.ply")
+        print("saving to %s"%(save_path))
+        #bg_mesh.export(save_path)
+        bg_mesh.trimesh.exchange.ply.export_ply(save_path)
+
+
+
