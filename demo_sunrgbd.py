@@ -26,6 +26,8 @@ def parse_args():
     return parser.parse_args()
 
 if __name__=="__main__":
+    
+    print("main method entered")
     args=parse_args()
     '''need to specify which weight files to load in the .yaml file'''
     instPIFu_config_path="./configs/demo_sunrgbd_instPIFu.yaml"
@@ -58,33 +60,42 @@ if __name__=="__main__":
 
     SUNRGBD_recon_dataset=SUNRGBD_Recon_Dataset(instPIFu_config,"test",testid=args.testid)
     SUNRGBD_recon_loader=dataset2dataloader(SUNRGBD_recon_dataset)
-
-    save_folder=os.path.join("outputs",args.testid)
+    
+    # PEHAPS IMPROVE THIS ONE 
+    save_folder=os.path.join("/amydata/PhotoSceneInstpifu/data/instpifu/outputs",args.testid)
     if os.path.exists(save_folder)==False:
         os.makedirs(save_folder)
     '''inference all objects'''
     start_t=time.time()
     for batch_id, data_batch in enumerate(SUNRGBD_recon_loader):
+        
+        
         for key in data_batch:
             if isinstance(data_batch[key], list) == False:
                 data_batch[key] = data_batch[key].float().cuda()
         with torch.no_grad():
             mesh = instPIFu_model.extract_mesh(data_batch, instPIFu_config['data']['marching_cube_resolution'])
-            rot_matrix=data_batch["rot_matrix"][0].cpu().numpy()
+            rot_matrix=data_batch["rot_matrix"][0].cpu().numpy() 
             obj_cam_center=data_batch["obj_cam_center"][0].cpu().numpy()
             bbox_size=data_batch["bbox_size"][0].cpu().numpy()
-            #pitch=data_batch["pitch"][0].cpu().numpy()
+            #pitch=data_batch["pitch"][0].cpu().numpy() #this was already commented out
 
             '''transform mesh to camera coordinate'''
+            
             obj_vert=np.asarray(mesh.vertices)
             obj_vert=obj_vert/2*bbox_size
-            obj_vert=np.dot(obj_vert,rot_matrix.T)
-            obj_vert[:,0:2]=-obj_vert[:,0:2]
-            obj_vert+=obj_cam_center
+            
+            
+            #obj_vert=np.dot(obj_vert,rot_matrix.T)
+            #obj_vert[:,0:2]=-obj_vert[:,0:2] #we might need this line for correct untransformed objects
+            #obj_vert+=obj_cam_center
+            
+            
             mesh.vertices=np.asarray(obj_vert.copy())
-
             object_id=data_batch["obj_id"][0]
-            save_path=os.path.join(save_folder,args.testid+"_%s"%(object_id)+".ply")
+            cls_code=int(data_batch['cls_codes'].argmax()) + 1
+            
+            save_path=os.path.join(save_folder,"%s"%(object_id)+".obj")
             print("saving to %s"%(save_path))
             mesh.export(save_path)
         msg = "{:0>8},[{}/{}]".format(
@@ -93,6 +104,10 @@ if __name__=="__main__":
             len(SUNRGBD_recon_loader),
         )
         print(msg)
+       
+    print("for loop completed")
+    
+    
     bg_PIFu_input={
         "image":data_batch["bg_image"],
         "intrinsic":data_batch["bg_intrinsic"],
@@ -105,12 +120,14 @@ if __name__=="__main__":
     print("saving to %s" % (save_path))
     bg_mesh.export(save_path)
     #print(bg_mesh.vertices)
+    
 
     whole_image=data_batch["whole_image"][0].cpu()*torch.tensor([0.229,0.224,0.225])[:,None,None]+\
     torch.tensor([0.485,0.456,0.406])[:,None,None]
     whole_image=(whole_image.permute(1,2,0).numpy()*255.0).astype(np.uint8)
     save_path=os.path.join(save_folder,"input.jpg")
     cv2.imwrite(save_path,whole_image)
+    
 
 
 
