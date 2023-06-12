@@ -7,7 +7,7 @@ phase: reconstruction
 debug: False
 device:
   use_gpu: True
-  gpu_ids: '2'
+  gpu_ids: '0'
 data:
   dataset: sunrgbd_recon
   split: ./data/sunrgbd/splits/test_object.json
@@ -22,7 +22,7 @@ data:
   use_crop: True
   use_instance_mask: True
   use_pred_pose: True
-  pred_pose_path: ./checkpoints/3d_box_test_new/visualization
+  pred_pose_path: checkpoints/sunrgbd_det_results/visualization
 model:
   mlp_dim: [549, 1024, 512, 256, 128, 1]
   no_residual: False
