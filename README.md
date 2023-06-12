@@ -142,8 +142,7 @@ run the following command, make sure the testid appears in ./data/sunrgbd/test_o
 ```angular2html
 python demo_sunrgbd --testid 930
 ```
-visualization results will be as below (testid is 930):
-<p align="center"><img src="docs/visualize_sunrgbd.png" width="500px"/></p></br>
+Unlike the base InstPIFu version, this will not generate files with correct furniture orientation.
 
 
 # Citation
